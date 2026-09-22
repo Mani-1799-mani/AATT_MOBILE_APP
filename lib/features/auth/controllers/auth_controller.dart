@@ -9,6 +9,7 @@ import 'package:aatt/features/auth/data/user_repository.dart';
 import 'package:aatt/features/auth/data/director_repository.dart';
 import 'package:aatt/features/auth/services/director_service.dart';
 import 'package:aatt/features/auth/models/auth_state.dart';
+import 'package:aatt/features/auth/app_review_demo.dart';
 
 // ─── Providers ───────────────────────────────────────────────────────────────
 
@@ -154,10 +155,17 @@ class AuthController extends StateNotifier<AuthState> {
 
   // ── Phone Authentication ─────────────────────────────────────────────────
 
+  /// Sends OTP for a visible App Review demo account without the
+  /// "number must already be registered" login pre-check.
+  Future<void> startAppReviewDemo(String phoneNumber) async {
+    _lastOtpSentAt = null;
+    await sendOtp(phoneNumber);
+  }
+
   /// Step 1: Send OTP to the given phone number.
   Future<void> sendOtp(String phoneNumber) async {
     // Rate-limit: prevent spamming OTP requests.
-    if (_lastOtpSentAt != null) {
+    if (!AppReviewDemo.isDemoPhone(phoneNumber) && _lastOtpSentAt != null) {
       final elapsed = DateTime.now().difference(_lastOtpSentAt!).inSeconds;
       if (elapsed < _minOtpIntervalSeconds) {
         state = state.copyWith(

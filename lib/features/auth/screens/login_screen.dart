@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:aatt/features/auth/controllers/auth_controller.dart';
 import 'package:aatt/features/auth/models/auth_state.dart';
+import 'package:aatt/features/auth/app_review_demo.dart';
 import 'package:aatt/core/router/app_router.dart';
 import 'package:aatt/core/widgets/ui_helpers.dart';
 
@@ -37,6 +39,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final completePhoneNumber = '+91$phone';
 
+    if (AppReviewDemo.isDemoPhone(completePhoneNumber)) {
+      await ref
+          .read(authControllerProvider.notifier)
+          .startAppReviewDemo(completePhoneNumber);
+      return;
+    }
+
     // Pre-check: verify the phone is registered before sending OTP
     setState(() => _isCheckingPhone = true);
     try {
@@ -58,6 +67,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     await ref.read(authControllerProvider.notifier).sendOtp(completePhoneNumber);
+  }
+
+  Future<void> _onAppReviewDemo() async {
+    _phoneController.text = AppReviewDemo.phoneLocal;
+    setState(() {});
+    await ref
+        .read(authControllerProvider.notifier)
+        .startAppReviewDemo(AppReviewDemo.phoneE164);
+  }
+
+  Future<void> _openUrl(Uri uri) async {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      _showError('Unable to open link.');
+    }
   }
 
   void _showError(String msg) {
@@ -266,30 +290,96 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       letterSpacing: 0.1,
                     ),
                   ),
-                  SizedBox(height: size.height * 0.08),
-                  // Terms and Privacy
-                  RichText(
+                  const SizedBox(height: 28),
+                  Text(
+                    'App Review demo login',
+                    style: GoogleFonts.roboto(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1D1B20),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'No SMS required. Phone 9999999999 · OTP 123456',
                     textAlign: TextAlign.center,
-                    text: TextSpan(
+                    style: GoogleFonts.roboto(
+                      fontSize: 11,
+                      color: const Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: isBusy ? null : _onAppReviewDemo,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1652FE),
+                        side: const BorderSide(color: Color(0xFF1652FE)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: Text(
+                        'App Review demo login',
+                        style: GoogleFonts.roboto(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: size.height * 0.06),
+                  // Terms and Privacy
+                  Text.rich(
+                    TextSpan(
                       style: GoogleFonts.roboto(
                         fontSize: 10,
                         fontWeight: FontWeight.normal,
                         color: const Color(0xFF9097A9),
                         letterSpacing: 0.1,
                       ),
-                      children: const [
-                        TextSpan(text: 'By continuing you agree to our '),
-                        TextSpan(
-                          text: 'Terms of service',
-                          style: TextStyle(decoration: TextDecoration.underline),
+                      children: [
+                        const TextSpan(text: 'By continuing you agree to our '),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: GestureDetector(
+                            onTap: () => _openUrl(
+                              Uri.parse('https://aatt.app/privacy-policy'),
+                            ),
+                            child: Text(
+                              'Terms of service',
+                              style: GoogleFonts.roboto(
+                                fontSize: 10,
+                                color: const Color(0xFF9097A9),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
                         ),
-                        TextSpan(text: ' & '),
-                        TextSpan(
-                          text: 'Privacy policy',
-                          style: TextStyle(decoration: TextDecoration.underline),
+                        const TextSpan(text: ' & '),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: GestureDetector(
+                            onTap: () => _openUrl(
+                              Uri.parse('https://aatt.app/privacy-policy'),
+                            ),
+                            child: Text(
+                              'Privacy policy',
+                              style: GoogleFonts.roboto(
+                                fontSize: 10,
+                                color: const Color(0xFF9097A9),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
                 ],

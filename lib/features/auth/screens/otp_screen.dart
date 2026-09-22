@@ -6,6 +6,7 @@ import 'package:pinput/pinput.dart';
 import 'package:go_router/go_router.dart';
 import 'package:aatt/features/auth/controllers/auth_controller.dart';
 import 'package:aatt/features/auth/models/auth_state.dart';
+import 'package:aatt/features/auth/app_review_demo.dart';
 import 'package:aatt/core/router/app_router.dart';
 import 'package:aatt/core/widgets/ui_helpers.dart';
 
@@ -28,6 +29,14 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   void initState() {
     super.initState();
     _startCountdown();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final phone = ref.read(authControllerProvider).phoneNumber;
+      final demoOtp = AppReviewDemo.otpFor(phone);
+      if (demoOtp != null && mounted && _otpController.text.isEmpty) {
+        _otpController.text = demoOtp;
+        setState(() {});
+      }
+    });
   }
 
   void _startCountdown() {
@@ -234,6 +243,19 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 ),
 
                 const SizedBox(height: 22),
+                if (AppReviewDemo.isDemoPhone(phone))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      'App Review demo OTP: ${AppReviewDemo.otpFor(phone)}',
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1652FE),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
 
                 // ── OTP Input (6 boxes) ─────────────────────
                 Pinput(
