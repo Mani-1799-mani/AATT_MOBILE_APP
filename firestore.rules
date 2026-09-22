@@ -1,0 +1,286 @@
+rules_version = '2';
+
+// ──────────────────────────────────────────────────────
+// Firestore Security Rules for AATT
+// ──────────────────────────────────────────────────────
+// The Admin Panel uses Firebase Admin SDK (server-side),
+// which BYPASSES these rules entirely.
+//
+// These rules secure the Flutter mobile app's direct
+// Firestore access (Client SDK).
+// ──────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ─── DIRECTORS/PRODUCERS COLLECTION ──────────────────────────────────────
+    match /directors/{directorId} {
+      // Allow get access to authenticated users
+      allow get: if isAuthenticated();
+
+      // Allow list for authenticated users, or unauthenticated limit-1 phone checks
+      allow list: if isAuthenticated()
+                   ||
+                   (!isAuthenticated() &&
+                    request.query.limit == 1);
+      
+      // Allow create access for new directors/producers during registration
+      allow create: if isAuthenticated() 
+                    && request.auth.uid == directorId
+                    && isValidDirectorData(request.resource.data);
+      
+      // Allow update access only to the director's own profile
+      allow update: if isAuthenticated() 
+                    && request.auth.uid == directorId 
+                    && request.auth.uid == resource.data.uid
+                    && isValidDirectorUpdateData(request.resource.data);
+      
+      // Allow delete access only to the director's own profile (soft delete recommended)
+      allow delete: if isAuthenticated() 
+                    && request.auth.uid == directorId 
+                    && request.auth.uid == resource.data.uid;
+    }
+
+    // ─── Helper Functions for Directors ───────────────────────────────────────
+    function isValidDirectorData(data) {
+      return data.keys().hasAll(['uid', 'phoneNumber', 'firstName', 'lastName', 'fullName', 'role', 'status']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.phoneNumber is string && data.phoneNumber.size() > 0 &&
+             data.firstName is string && data.firstName.size() > 0 &&
+             data.lastName is string && data.lastName.size() > 0 &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.role in ['director', 'producer'] &&
+             data.status in ['active', 'inactive', 'pending', 'archived'] &&
+             data.uid == request.auth.uid;
+    }
+
+    function isValidDirectorUpdateData(data) {
+      return data.uid == resource.data.uid &&
+             data.phoneNumber == resource.data.phoneNumber &&
+             (data.role == resource.data.role || data.role in ['director', 'producer']) &&
+             (data.status == resource.data.status || data.status in ['active', 'inactive', 'pending', 'archived']) &&
+             data.firstName is string && data.firstName.size() > 0 &&
+             data.lastName is string && data.lastName.size() > 0 &&
+             data.fullName is string && data.fullName.size() > 0;
+    }
+
+    function hasActorDoc() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/actors/$(request.auth.uid));
+    }
+
+    function hasDirectorDoc() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/directors/$(request.auth.uid));
+    }
+
+    function currentRole() {
+      return hasActorDoc()
+        ? get(/databases/$(database)/documents/actors/$(request.auth.uid)).data.role
+        : hasDirectorDoc()
+          ? get(/databases/$(database)/documents/directors/$(request.auth.uid)).data.role
+          : null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+             (
+               request.auth.token.admin == true ||
+               currentRole() == "admin"
+             );
+    }
+
+    function isDirectorLike() {
+      return isAuthenticated() &&
+             (
+               currentRole() == "director" ||
+               currentRole() == "producer" ||
+               currentRole() == "admin"
+             );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() &&
+             request.auth.uid == userId;
+    }
+
+    function isValidRole(role) {
+      return role in ["actor", "director", "producer", "admin"];
+    }
+
+    function isValidAnnouncementStatus(status) {
+      return status in ["REVIEW", "PENDING", "APPROVED", "ACTIVE", "EXPIRED", "REJECTED"];
+    }
+
+    function isValidAnnouncementMediaList(images) {
+      return images is list
+             && images.size() <= 4
+             && (images.size() == 0 || images[0] is string)
+             && (images.size() <= 1 || images[1] is string)
+             && (images.size() <= 2 || images[2] is string)
+             && (images.size() <= 3 || images[3] is string);
+    }
+
+    function isValidAnnouncementCreateData(data) {
+      return data.keys().hasAll([
+               "submitterUid",
+               "submitterName",
+               "submitterAvatar",
+               "title",
+               "description",
+               "tags",
+               "status",
+               "submittedAt"
+             ])
+             && data.submitterUid == request.auth.uid
+             && data.submitterName is string
+             && data.submitterAvatar is string
+             && data.title is string
+             && data.title.size() > 0
+             && data.title.size() <= 160
+             && data.description is string
+             && data.description.size() > 0
+             && data.description.size() <= 5000
+             && data.tags is list
+             && data.status == "REVIEW"
+             && data.submittedAt is timestamp
+             && (!('reviewedAt' in data) || data.reviewedAt == null)
+             && (!('reviewedBy' in data) || data.reviewedBy == null)
+             && (!('startsAt' in data) || data.startsAt is timestamp)
+             && (!('expiresAt' in data) || data.expiresAt is timestamp)
+             && (!('thumbnailUrl' in data) || data.thumbnailUrl is string)
+             && (!('bannerImageUrls' in data) || isValidAnnouncementMediaList(data.bannerImageUrls));
+    }
+
+    function isValidAnnouncementUpdateData(newData, oldData) {
+      return newData.submitterUid == oldData.submitterUid
+             && newData.submitterUid == request.auth.uid
+             && newData.submitterName == oldData.submitterName
+             && newData.submitterAvatar == oldData.submitterAvatar
+             && newData.title is string
+             && newData.title.size() > 0
+             && newData.title.size() <= 160
+             && newData.description is string
+             && newData.description.size() > 0
+             && newData.description.size() <= 5000
+             && newData.tags is list
+             && newData.submittedAt is timestamp
+             && newData.status in ["REVIEW", "EXPIRED"]
+             && (!('reviewedAt' in newData) || newData.reviewedAt == null || newData.reviewedAt is timestamp)
+             && (!('reviewedBy' in newData) || newData.reviewedBy == null || newData.reviewedBy is string)
+             && (!('startsAt' in newData) || newData.startsAt is timestamp)
+             && (!('expiresAt' in newData) || newData.expiresAt is timestamp)
+             && (!('thumbnailUrl' in newData) || newData.thumbnailUrl is string)
+             && (!('bannerImageUrls' in newData) || isValidAnnouncementMediaList(newData.bannerImageUrls));
+    }
+
+    // ─── Actors ──────────────────────────────────────
+    // Authenticated users can read any actor profile.
+    // List queries are allowed for any authenticated user (search, browse).
+    // Unauthenticated users get a very limited list (limit=1) for phone checks.
+    // Owners can create/update their own profile.
+    match /actors/{actorId} {
+      allow get: if true;
+
+      allow list: if true;
+
+      allow create: if isOwner(actorId)
+                    && request.resource.data.uid == request.auth.uid
+                    && isValidRole(request.resource.data.role);
+
+      allow update: if isOwner(actorId)
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.role == resource.data.role;
+
+      allow delete: if false;
+    }
+
+    // ─── Users (App Profile) ─────────────────────────
+    // Stores app-level per-user settings/state such as wishlistedActorIds.
+    // Each authenticated user can read/write only their own document.
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ─── Announcements ──────────────────────────────
+    // Actors can read:
+    //   • APPROVED, ACTIVE, or EXPIRED announcements (public feed)
+    // Directors/Producers can read:
+    //   • APPROVED, ACTIVE, EXPIRED, REVIEW, PENDING, REJECTED (own announcements only)
+    // Directors/Producers can create (status must be REVIEW).
+    // Directors/Producers can update their own docs (close → EXPIRED, repost → REVIEW).
+    // Directors/Producers can delete their own rejected/expired announcements.
+    match /announcements/{announcementId} {
+      // Actors: see approved/live and expired announcements (public feed)
+      // Directors/Producers: see their own announcements at any status
+      allow read: if isAuthenticated()
+                  && (
+                    // Actors can read APPROVED, ACTIVE, or EXPIRED announcements
+                    isValidAnnouncementStatus(resource.data.status)
+                    && resource.data.status in ["APPROVED", "ACTIVE", "EXPIRED"]
+                    ||
+                    // Directors/Producers can read all of their own announcements
+                    resource.data.submitterUid == request.auth.uid
+                  );
+      allow create: if isAuthenticated()
+                    && isDirectorLike()
+                    && isValidAnnouncementCreateData(request.resource.data);
+      allow update: if isAuthenticated()
+                    && isDirectorLike()
+                    && resource.data.submitterUid == request.auth.uid
+                    && isValidAnnouncementUpdateData(request.resource.data, resource.data);
+      allow delete: if isAuthenticated()
+                    && isDirectorLike()
+                    && resource.data.submitterUid == request.auth.uid;
+    }
+
+    // ─── Approvals ──────────────────────────────────
+    // Only readable/writable by Admin SDK, except actors can create their own approval requests.
+    match /approvals/{approvalId} {
+      allow read: if isAdmin()
+                  || (isAuthenticated() && resource.data.actorId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.actorId == request.auth.uid;
+      allow update, delete: if false; // Admin SDK only
+    }
+
+    // ─── Activity Log ───────────────────────────────
+    // Read-only for admins. Write-only via Admin SDK.
+    match /activity_log/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false; // Admin SDK only
+    }
+
+    // ─── Advertisements ─────────────────────────────
+    // Home banner ads are readable by authenticated users.
+    // Clients can only increment `clicks` on existing ads.
+    match /advertisements/{adId} {
+      allow get, list: if isAuthenticated();
+
+      allow update: if isAuthenticated()
+                    && request.resource.data.diff(resource.data).changedKeys().hasOnly(['clicks'])
+                    && request.resource.data.clicks is int
+                    && resource.data.clicks is int
+                    && request.resource.data.clicks == resource.data.clicks + 1;
+
+      allow create, delete: if false;
+    }
+
+    // ─── Phone Index (Actor Phone → Doc Mapping) ───
+    // Read-only for authenticated users (used by checkPhoneRegistered CF).
+    // Write-only via Admin SDK / Cloud Functions.
+    match /phone_index/{phoneId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Cloud Functions / Admin SDK only
+    }
+
+    // ─── Default: Deny Everything ───────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

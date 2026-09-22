@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "914049158539",
+    "firebase_url": "https://aatt-b3e3e-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "aatt-b3e3e",
+    "storage_bucket": "aatt-b3e3e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914049158539:android:dbb93b0e1bd154d636338e",
+        "android_client_info": {
+          "package_name": "com.aatt.aatt"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914049158539-d6h9h3coihgt67h0p0mmskai1srscvsh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aatt.aatt",
+            "certificate_hash": "ce424e7b8717636f466983420cab1eeccb8cfd3b"
+          }
+        },
+        {
+          "client_id": "914049158539-pq1ln5t5n0st35hb308j1g5sslu4hej0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aatt.aatt",
+            "certificate_hash": "f980549d0ae1f9b8dc47bb8c846821666815813a"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABw7d0VVL7CtJeelwbbRn6GnfvoLcK5Ls"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914049158539-fn0ocs5pmc01q11d2ta85g2601o49fia.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.palatenetworks.aatt"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

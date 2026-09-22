@@ -1,0 +1,143 @@
+// Firestore Security Rules for Directors/Producers Collection
+// Add these rules to your firestore.rules file
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ── Directors/Producers Collection Rules ──────────────────────────────
+    match /directors/{directorId} {
+      
+      // Allow read access to all authenticated users
+      // This enables directors/producers to discover each other
+      allow read: if request.auth != null;
+      
+      // Allow create if the user is authenticated and the document 
+      // is being created with their own uid
+      allow create: if request.auth != null 
+                   && request.auth.uid == directorId
+                   && request.auth.uid == resource.data.uid
+                   && isValidDirectorData(request.resource.data);
+      
+      // Allow update only by the document owner
+      allow update: if request.auth != null 
+                   && request.auth.uid == directorId
+                   && request.auth.uid == resource.data.uid
+                   && isValidDirectorData(request.resource.data)
+                   && !willChangeRestrictedFields();
+      
+      // Allow delete only by the document owner
+      allow delete: if request.auth != null 
+                   && request.auth.uid == directorId
+                   && request.auth.uid == resource.data.uid;
+    }
+    
+    // ── Helper Functions ─────────────────────────────────────────────────
+    
+    // Validate director/producer data structure and content
+    function isValidDirectorData(data) {
+      let requiredFields = ['uid', 'phoneNumber', 'firstName', 'lastName', 'fullName', 'role', 'status'];
+      let allowedRoles = ['director', 'producer'];
+      let allowedStatuses = ['active', 'inactive', 'pending', 'archived'];
+      
+      return hasAllFields(data, requiredFields)
+          && data.role in allowedRoles
+          && data.status in allowedStatuses
+          && data.uid is string && data.uid.size() > 0
+          && data.phoneNumber is string && data.phoneNumber.size() > 0
+          && data.firstName is string && data.firstName.size() > 0
+          && data.lastName is string && data.lastName.size() > 0
+          && data.fullName is string && data.fullName.size() > 0
+          && isValidOptionalFields(data);
+    }
+    
+    // Check if all required fields are present
+    function hasAllFields(data, fields) {
+      return fields.toSet().difference(data.keys().toSet()).size() == 0;
+    }
+    
+    // Validate optional fields if they exist
+    function isValidOptionalFields(data) {
+      return (!('email' in data) || (data.email is string))
+          && (!('bio' in data) || (data.bio is string))
+          && (!('experience' in data) || (data.experience is int && data.experience >= 0))
+          && (!('specializations' in data) || (data.specializations is list))
+          && (!('awards' in data) || (data.awards is list))
+          && (!('projects' in data) || (data.projects is list))
+          && (!('contactInfo' in data) || (data.contactInfo is map))
+          && (!('socialMedia' in data) || (data.socialMedia is map))
+          && (!('productionHouse' in data) || (data.productionHouse is string))
+          && (!('profileImageUrl' in data) || (data.profileImageUrl is string));
+    }
+    
+    // Prevent changes to critical fields during updates
+    function willChangeRestrictedFields() {
+      return request.resource.data.uid != resource.data.uid
+          || request.resource.data.phoneNumber != resource.data.phoneNumber
+          || ('createdAt' in resource.data && request.resource.data.createdAt != resource.data.createdAt);
+    }
+    
+    // ── Query-specific rules for better performance ─────────────────────
+    
+    // Allow queries with specific constraints to prevent expensive operations
+    function isValidQuery() {
+      return request.query.limit <= 50  // Limit query size
+          && (
+            // Allow queries by role
+            ('role' in request.query.where && request.query.where.role in ['director', 'producer'])
+            // Allow queries by status
+            || ('status' in request.query.where && request.query.where.status in ['active', 'inactive', 'pending'])
+            // Allow queries by production house
+            || ('productionHouse' in request.query.where)
+            // Allow queries with ordering by createdAt
+            || ('createdAt' in request.query.orderBy)
+          );
+    }
+    
+    // ── Additional security for sensitive operations ────────────────────
+    
+    // Only allow certain updates based on user context
+    function canUpdateField(field) {
+      // Anyone can update their own profile fields except restricted ones
+      let restrictedFields = ['uid', 'phoneNumber', 'createdAt'];
+      return !(field in restrictedFields);
+    }
+    
+    // Validate phone number format (basic validation)
+    function isValidPhoneNumber(phone) {
+      return phone.matches('^\\+?[1-9]\\d{1,14}$');
+    }
+    
+    // ── Admin-specific rules (if you have admin users) ──────────────────
+    
+    // Check if user has admin privileges
+    // You would implement this based on your admin user system
+    function isAdmin() {
+      // Example: Check if user is in an admin collection or has admin claims
+      // return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return false; // Disabled by default - implement based on your needs
+    }
+    
+    // Admin override rules (uncomment if you implement admin system)
+    /*
+    match /directors/{directorId} {
+      allow read, write: if isAdmin();
+    }
+    */
+  }
+}
+
+// ── Collections Index Recommendations ─────────────────────────────────────
+// Add these indexes in Firebase Console or via Firebase CLI for better query performance:
+//
+// Collection: directors
+// Fields indexed: 
+//   - role (Ascending) + createdAt (Descending)
+//   - status (Ascending) + createdAt (Descending) 
+//   - productionHouse (Ascending) + createdAt (Descending)
+//   - specializations (Array) + createdAt (Descending)
+//   - phoneNumber (Ascending) - for uniqueness checks
+//   - fullName (Ascending) - for search queries
+//
+// Example Firebase CLI command:
+// firebase firestore:indexes --project your-project-id

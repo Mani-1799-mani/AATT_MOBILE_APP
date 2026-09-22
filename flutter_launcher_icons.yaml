@@ -1,0 +1,17 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  # Remove alpha channel for iOS (required)
+  remove_alpha_ios: true
+  # Use the same icon for both light and dark mode
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  # Web/desktop support (optional)
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false

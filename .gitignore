@@ -1,0 +1,79 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.iml
+*.class
+*.log
+.idea/
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+key.properties
+**/upload-keystore.jks
+
+# Local tooling
+.claude/
+.DS_Store
+**/.DS_Store
+*.swp
+.atom/
+.svn/
+
+# Android
+**/android/.gradle/
+**/android/local.properties
+**/android/**/gradle-wrapper.jar
+**/android/.cxx/
+**/android/captures/
+
+# iOS / Xcode
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/**/xcuserdata/
+**/ios/**/DerivedData/
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/dgph
+**/ios/Flutter/Flutter.podspec
+
+# macOS
+**/macos/Flutter/ephemeral/
+**/macos/Pods/
+
+# Linux
+**/linux/flutter/ephemeral/
+
+# Windows
+**/windows/flutter/ephemeral/
+
+# Large local artifacts
+symbols.zip
+**/Build Runner_*.txt

@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isUnder10Mb() {
+      return request.resource != null
+        && request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    function isImage() {
+      return request.resource != null
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    function isImageOrPdf() {
+      return request.resource != null
+        && request.resource.contentType.matches('image/.*|application/pdf');
+    }
+
+    // New path format used by app code.
+    match /announcements/{mediaType}/{uid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isOwner(uid)
+                                    && mediaType in ['thumbnails', 'banners', 'references']
+                                    && isUnder10Mb()
+                                    && isImageOrPdf();
+    }
+
+    // Backward compatibility for any old files uploaded without uid folder.
+    match /announcements/{mediaType}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+                    && mediaType in ['thumbnails', 'banners', 'references']
+                    && isUnder10Mb()
+                    && isImageOrPdf();
+      allow update, delete: if false;
+    }
+
+    match /directors/profile/{uid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isOwner(uid)
+                                    && isUnder10Mb()
+                                    && isImage();
+    }
+
+    match /actors/profile/{uid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isOwner(uid)
+                                    && isUnder10Mb()
+                                    && isImage();
+    }
+
+    match /actors/gallery/{uid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isOwner(uid)
+                                    && isUnder10Mb()
+                                    && isImage();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
