@@ -46,6 +46,10 @@ class AuthController extends StateNotifier<AuthState> {
   // Keep track internally so we can auto-resolve SMS code on Android.
   int? _resendToken;
   ConfirmationResult? _webConfirmationResult;
+  /// Survives auth-state updates that rebuild the OTP screen.
+  String? _verificationId;
+  /// OTP typed before Firebase finishes sending the code.
+  String? _pendingSmsCode;
 
   static const _functionsRegion = 'us-central1';
 
@@ -176,7 +180,9 @@ class AuthController extends StateNotifier<AuthState> {
       }
     }
 
-    // Clear any previous error before starting.
+    // Clear any previous error before starting. Drop the old code session
+    // only for this new send; a code entered early is kept in _pendingSmsCode.
+    _verificationId = null;
     state = AuthState(
       status: AuthStatus.sendingOtp,
       phoneNumber: phoneNumber,
@@ -186,12 +192,14 @@ class AuthController extends StateNotifier<AuthState> {
       if (kIsWeb) {
         final result = await _auth.signInWithPhoneNumber(phoneNumber);
         _webConfirmationResult = result;
+        _verificationId = 'web-confirmation';
         _lastOtpSentAt = DateTime.now();
         state = AuthState(
           status: AuthStatus.otpSent,
           phoneNumber: phoneNumber,
-          verificationId: 'web-confirmation',
+          verificationId: _verificationId,
         );
+        _verifyPendingCode();
         return;
       }
 
@@ -235,19 +243,33 @@ class AuthController extends StateNotifier<AuthState> {
 
   void _onCodeSent(String verificationId, int? resendToken) {
     _resendToken = resendToken;
+    _verificationId = verificationId;
     _lastOtpSentAt = DateTime.now();
     state = AuthState(
       status: AuthStatus.otpSent,
       phoneNumber: state.phoneNumber,
       verificationId: verificationId,
     );
+    _verifyPendingCode();
   }
 
   void _onAutoRetrievalTimeout(String verificationId) {
     // Keep verificationId valid; user can still enter manually.
-    if (state.status == AuthStatus.otpSent) {
-      state = state.copyWith(verificationId: verificationId);
+    _verificationId ??= verificationId;
+    if (state.status == AuthStatus.otpSent ||
+        state.status == AuthStatus.sendingOtp) {
+      state = state.copyWith(
+        status: AuthStatus.otpSent,
+        verificationId: _verificationId,
+      );
     }
+  }
+
+  void _verifyPendingCode() {
+    final pending = _pendingSmsCode;
+    if (pending == null || pending.length < 6) return;
+    _pendingSmsCode = null;
+    verifyOtp(pending);
   }
 
   /// Step 2: Verify the 6-digit OTP code.
@@ -296,13 +318,20 @@ class AuthController extends StateNotifier<AuthState> {
       return;
     }
 
-    final verificationId = state.verificationId;
+    final verificationId = _verificationId ?? state.verificationId;
     if (verificationId == null) {
+      // Demo OTP is filled as soon as the screen opens, which can be before
+      // Firebase finishes sending. Hold that code and verify when it arrives.
+      if (state.status == AuthStatus.sendingOtp) {
+        _pendingSmsCode = smsCode;
+        return;
+      }
       state = state.copyWith(
         errorMessage: 'Session expired. Please resend the code.',
       );
       return;
     }
+    _verificationId = verificationId;
 
     // Clear any previous error and set verifying state.
     state = state.copyWith(
@@ -454,6 +483,10 @@ class AuthController extends StateNotifier<AuthState> {
   // ── Sign Out ─────────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
+    _verificationId = null;
+    _pendingSmsCode = null;
+    _webConfirmationResult = null;
+    _resendToken = null;
     await _auth.signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }

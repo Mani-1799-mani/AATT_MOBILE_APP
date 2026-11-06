@@ -154,7 +154,3 @@ export const linkPhoneToActor = onCall(
     };
   }
 );
-
-// sendMaskedNotification lives in notifications.ts — deploy separately once
-// Twilio secrets are configured:
-//   firebase deploy --only functions:default:sendMaskedNotification

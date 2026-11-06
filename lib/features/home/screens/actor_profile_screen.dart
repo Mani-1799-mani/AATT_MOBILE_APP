@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
+import 'package:aatt/core/services/native_sms.dart';
 import 'package:aatt/core/widgets/ui_helpers.dart';
 import 'package:aatt/features/home/models/actor_model.dart';
 import 'package:aatt/features/home/widgets/wishlist_heart_button.dart';
@@ -123,17 +123,6 @@ class _ActorProfileScreenState extends ConsumerState<ActorProfileScreen> {
       return;
     }
 
-    String senderPhone = authState.phoneNumber ?? '';
-    if (senderPhone.isEmpty) {
-      if (!mounted) return;
-      showPremiumSnackbar(
-        context,
-        'Your phone number is not available. Please re-login.',
-        isError: true,
-      );
-      return;
-    }
-
     setState(() {
       _isSendingSms = true;
     });
@@ -173,42 +162,29 @@ class _ActorProfileScreenState extends ConsumerState<ActorProfileScreen> {
       senderDesignation = senderDesignation.trim().isEmpty
           ? kAattFullName
           : senderDesignation.trim();
-      senderPhone = senderPhone.trim();
 
-      if (senderPhone.isEmpty) {
-        if (!mounted) return;
-        showPremiumSnackbar(
-          context,
-          'Your phone number is not available. Please re-login.',
-          isError: true,
-        );
-        return;
-      }
+      final phone = await NativeSms.phoneForActor(actor.id);
+      final actorName = actor.name.trim().isEmpty ? 'there' : actor.name.trim();
+      final message =
+          'Hello $actorName, $senderName ($senderDesignation) from AATT wants to connect with you. Open the AATT app.';
 
-      // Call Cloud Function
-      final httpsCallable = FirebaseFunctions.instance.httpsCallable(
-        'sendMaskedNotification',
+      await NativeSms.openComposer(phone: phone, message: message);
+
+      if (!mounted) return;
+      showPremiumSnackbar(
+        context,
+        'Messages opened. Review the text, then press Send.',
       );
-
-      if (!mounted) return;
-      showPremiumSnackbar(context, 'Sending SMS in background...');
-
-      await httpsCallable.call({
-        'targetId': actor.id,
-        'senderName': senderName,
-        'senderDesignation': senderDesignation,
-        'senderPhone': senderPhone,
-      });
-
-      if (!mounted) return;
-      showPremiumSnackbar(context, 'SMS sent successfully!');
     } catch (e) {
       if (!mounted) return;
-      String errorMsg = 'Failed to send SMS. Please try again.';
-      if (e is FirebaseFunctionsException) {
-        errorMsg = e.message ?? errorMsg;
-      }
-      showPremiumSnackbar(context, errorMsg, isError: true);
+      final message = e.toString().replaceFirst('Exception: ', '').trim();
+      showPremiumSnackbar(
+        context,
+        message.isEmpty
+            ? 'Could not open the Messages app. Please try again.'
+            : message,
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -226,9 +202,7 @@ class _ActorProfileScreenState extends ConsumerState<ActorProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = actor.contactMasked
-        ? 'Contact masked \u2022 tap Send SMS to connect'
-        : (actor.phone ?? '');
+    final subtitle = 'Contact masked \u2022 tap Send SMS to connect';
 
     return Scaffold(
       backgroundColor: Colors.white,

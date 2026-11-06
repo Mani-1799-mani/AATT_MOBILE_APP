@@ -162,9 +162,7 @@ class ActorProfileUpdateApi {
     if (kIsWeb) {
       return Uri.parse(path);
     }
-    throw Exception(
-      'Missing API base URL. Provide --dart-define=AATT_API_BASE_URL=https://your-backend.com',
-    );
+    return Uri.parse('https://aatt-b3e3e.web.app$path');
   }
 
   Map<String, dynamic> _decodeJson(String body) {

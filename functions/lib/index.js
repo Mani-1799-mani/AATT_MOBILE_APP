@@ -143,7 +143,4 @@ exports.linkPhoneToActor = (0, https_1.onCall)({ cors: true }, async (request) =
         actorId: actorDocId,
     };
 });
-// sendMaskedNotification lives in notifications.ts — deploy separately once
-// Twilio secrets are configured:
-//   firebase deploy --only functions:default:sendMaskedNotification
 //# sourceMappingURL=index.js.map

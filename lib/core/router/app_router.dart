@@ -56,14 +56,15 @@ class AppRoutes {
 // ─── Router Provider ─────────────────────────────────────────────────────────
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authControllerProvider);
+  final refresh = _AuthNotifier(ref);
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
-    refreshListenable: _AuthNotifier(ref),
+    refreshListenable: refresh,
     redirect: (context, routerState) {
-      final status = authState.status;
+      final status = ref.read(authControllerProvider).status;
       final currentPath = routerState.matchedLocation;
 
       // ── Splash: wait until auth resolves ───────────────────────────────
